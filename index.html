@@ -366,6 +366,53 @@
           </div>
         </div>
       </div>
+
+      <!-- Section: Ranking Komplain Paling Sering Muncul -->
+      <div class="glass-card rounded-2xl p-6">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+              Peringkat Keluhan Keseluruhan (Paling Sering ke Jarang)
+            </h2>
+            <p class="text-xs text-gray-400 mt-1">Akumulasi seluruh jenis komplain FTL Gym diurutkan berdasarkan frekuensi kemunculan</p>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <select id="rankingCabangFilter" onchange="updateComplaintRanking()" class="px-3 py-1.5 rounded-xl bg-gray-900 border border-gray-700 text-xs text-white focus:outline-none focus:border-amber-500">
+              <option value="ALL">Semua Cabang (4.066 Kasus)</option>
+            </select>
+            <span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30" id="totalComplaintBadge">
+              Total: 4.066 Komplain
+            </span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <!-- Grafik Horizontal Bar (7 Kolom) -->
+          <div class="lg:col-span-7 bg-gray-900/70 rounded-xl p-4 border border-gray-800">
+            <div class="relative h-[420px] w-full">
+              <canvas id="topComplaintsChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Tabel Ranking Detail (5 Kolom) -->
+          <div class="lg:col-span-5 overflow-x-auto max-h-[420px] overflow-y-auto border border-gray-800 rounded-xl">
+            <table class="min-w-full divide-y divide-gray-800 text-xs">
+              <thead class="bg-gray-900 sticky top-0 z-10">
+                <tr>
+                  <th class="px-3 py-3 text-left font-bold text-gray-400 uppercase tracking-wider w-14">Rank</th>
+                  <th class="px-3 py-3 text-left font-bold text-gray-400 uppercase tracking-wider">Jenis / Topik Komplain</th>
+                  <th class="px-3 py-3 text-right font-bold text-gray-400 uppercase tracking-wider">Jumlah</th>
+                  <th class="px-3 py-3 text-right font-bold text-gray-400 uppercase tracking-wider">Persentase</th>
+                </tr>
+              </thead>
+              <tbody id="topComplaintsTableBody" class="divide-y divide-gray-800/70 bg-gray-900/40">
+                <!-- Diisi otomatis oleh JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- TAB 4: FULL EXCEL DATABASE TABLE -->
@@ -675,6 +722,17 @@
         opt.textContent = `${sol.code}: ${sol.title} (${count})`;
         solSel.appendChild(opt);
       });
+
+      const rankCabSel = document.getElementById('rankingCabangFilter');
+      if (rankCabSel) {
+        META.cabangs.forEach(c => {
+          const count = ALL_ROWS.filter(r => META.cabangs[r[2]] === c).length;
+          const opt = document.createElement('option');
+          opt.value = c;
+          opt.textContent = `${c} (${count})`;
+          rankCabSel.appendChild(opt);
+        });
+      }
     }
 
     function renderSolutionsGrid() {
@@ -1024,6 +1082,136 @@
           }
         }
       });
+
+      // 4. Render Peringkat Keluhan Keseluruhan (Paling Sering ke Jarang)
+      renderComplaintRanking(ALL_ROWS, 'kategori');
+    }
+
+    /**
+     * Fungsi untuk menghitung & merender ranking komplain dari paling sering ke jarang
+     * @param {Array} complaintsData - Array objek/baris data komplain
+     * @param {String} categoryField - Nama properti/kolom jenis komplain (default: 'kategori')
+     */
+    function renderComplaintRanking(complaintsData, categoryField = 'kategori') {
+      // 1. Hitung frekuensi kemunculan tiap jenis komplain
+      const frequencyMap = {};
+      complaintsData.forEach(item => {
+        const rawLabel = Array.isArray(item)
+          ? META.kategoris[item[6]]
+          : item[categoryField];
+        const label = (rawLabel || 'Lainnya').trim();
+        frequencyMap[label] = (frequencyMap[label] || 0) + 1;
+      });
+
+      // 2. Urutkan dari yang paling sering (terbanyak) ke paling jarang (terdikit)
+      const sortedComplaints = Object.entries(frequencyMap)
+        .sort((a, b) => b[1] - a[1]);
+
+      const totalAll = complaintsData.length;
+      document.getElementById('totalComplaintBadge').textContent = `Total: ${totalAll.toLocaleString('id-ID')} Komplain`;
+
+      // 3. Render Tabel Ranking (klik baris untuk langsung filter database)
+      const tableBody = document.getElementById('topComplaintsTableBody');
+      tableBody.innerHTML = '';
+
+      sortedComplaints.forEach(([topic, count], index) => {
+        const percentage = totalAll > 0 ? ((count / totalAll) * 100).toFixed(1) : '0.0';
+
+        // Highlight badge untuk Top 3 masalah terbanyak
+        let rankBadge = `<span class="text-gray-400 font-semibold">#${index + 1}</span>`;
+        if (index === 0) rankBadge = `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40 font-extrabold text-[11px]">#1</span>`;
+        else if (index === 1) rankBadge = `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 font-extrabold text-[11px]">#2</span>`;
+        else if (index === 2) rankBadge = `<span class="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 font-extrabold text-[11px]">#3</span>`;
+
+        const row = `
+          <tr onclick="filterByComplaintTopic('${topic.replace(/'/g, "\'")}')" title="Klik untuk lihat daftar kasus ${topic}" class="hover:bg-gray-800/70 transition-colors cursor-pointer">
+            <td class="px-3 py-2.5 whitespace-nowrap">${rankBadge}</td>
+            <td class="px-3 py-2.5 font-semibold text-gray-200">${escapeHtml(topic)}</td>
+            <td class="px-3 py-2.5 text-right font-bold text-white">${count.toLocaleString('id-ID')}</td>
+            <td class="px-3 py-2.5 text-right text-amber-400 font-semibold">${percentage}%</td>
+          </tr>
+        `;
+        tableBody.insertAdjacentHTML('beforeend', row);
+      });
+
+      // 4. Render Horizontal Bar Chart (Chart.js)
+      const ctx = document.getElementById('topComplaintsChart').getContext('2d');
+
+      if (window.topComplaintsChartInstance) {
+        window.topComplaintsChartInstance.destroy();
+      }
+
+      const labels = sortedComplaints.map(item => item[0]);
+      const counts = sortedComplaints.map(item => item[1]);
+
+      // Gradasi warna: Merah untuk Top 3, Indigo/Cyan untuk sisanya
+      const barColors = counts.map((_, idx) => {
+        if (idx === 0) return '#e11d48'; // Rose 600 (Paling sering)
+        if (idx === 1) return '#f59e0b'; // Amber 500
+        if (idx === 2) return '#eab308'; // Yellow 500
+        return '#6366f1';                // Indigo 500
+      });
+
+      window.topComplaintsChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Frekuensi Komplain',
+            data: counts,
+            backgroundColor: barColors,
+            borderRadius: 6,
+            barThickness: 18
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (context) => {
+                  const val = context.raw;
+                  const pct = totalAll > 0 ? ((val / totalAll) * 100).toFixed(1) : '0.0';
+                  return ` ${val.toLocaleString('id-ID')} kali muncul (${pct}%)`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: { precision: 0, color: '#9CA3AF' },
+              grid: { color: 'rgba(255,255,255,0.06)' }
+            },
+            y: {
+              ticks: { color: '#E5E7EB', font: { size: 11, weight: '500' } },
+              grid: { display: false }
+            }
+          }
+        }
+      });
+    }
+
+    function updateComplaintRanking() {
+      const selectedCab = document.getElementById('rankingCabangFilter')?.value || 'ALL';
+      const subset = selectedCab === 'ALL'
+        ? ALL_ROWS
+        : ALL_ROWS.filter(r => META.cabangs[r[2]] === selectedCab);
+      renderComplaintRanking(subset, 'kategori');
+    }
+
+    function filterByComplaintTopic(topic) {
+      const selectedCab = document.getElementById('rankingCabangFilter')?.value || 'ALL';
+      document.getElementById('filter-search').value = topic;
+      document.getElementById('filter-severity').value = 'ALL';
+      document.getElementById('filter-sumber').value = 'ALL';
+      document.getElementById('filter-cabang').value = selectedCab;
+      document.getElementById('filter-solusi').value = 'ALL';
+      applyFilters();
+      switchTab('tab-database');
     }
   </script>
 </body>
